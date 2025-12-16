@@ -1,0 +1,10 @@
+bin/
+dist/
+codestash-cli
+*.exe
+*.exe~
+*.test
+*.out
+*.log
+/.code-stash-cli.yaml
+.DS_Store
