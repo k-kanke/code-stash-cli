@@ -9,3 +9,4 @@ codestash-cli
 /.code-stash-cli.yaml
 .DS_Store
 *.codestash
+*.gomodcache

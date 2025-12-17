@@ -59,6 +59,14 @@ type NoteSummary struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type UpdateNoteRequest struct {
+	Title    *string  `json:"title,omitempty"`
+	Language *string  `json:"language,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+	Code     *string  `json:"code,omitempty"`
+	Note     *string  `json:"note,omitempty"`
+}
+
 type Client struct {
 	baseURL      *url.URL
 	clientID     string
@@ -265,4 +273,28 @@ func (c *Client) ListNotes(ctx context.Context, accessToken, collectionID string
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return notes, nil
+}
+
+func (c *Client) UpdateNote(ctx context.Context, accessToken, noteID string, payload UpdateNoteRequest) error {
+	req, err := c.newRequest(ctx, "PATCH", "/api/notes/"+noteID, payload)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		apiErr, err := decodeAPIError(res.Body)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("api error: %s", apiErr.Code)
+	}
+
+	return nil
 }

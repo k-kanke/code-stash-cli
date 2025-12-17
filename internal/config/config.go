@@ -39,7 +39,7 @@ func setDefaults() {
 func defaultTokenPath() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ""
+		return "a"
 	}
 
 	return filepath.Join(home, ".config", "codestash", "token.json")
