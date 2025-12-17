@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,6 +33,20 @@ type TokenResponse struct {
 type APIError struct {
 	Code        string `json:"error"`
 	Description string `json:"error_description"`
+}
+
+type CreateNoteRequest struct {
+	CollectionID string   `json:"collection_id"`
+	FolderID     string   `json:"folder_id"`
+	Title        string   `json:"title"`
+	Language     string   `json:"language"`
+	Tags         []string `json:"tags"`
+	Code         string   `json:"code"`
+	Note         string   `json:"note"`
+}
+
+type CreateNoteResponse struct {
+	NoteID string `json:"id"`
 }
 
 type Client struct {
@@ -171,4 +186,36 @@ func decodeAPIError(r io.Reader) (*APIError, error) {
 		apiErr.Code = "unknown_error"
 	}
 	return &apiErr, nil
+}
+
+func (c *Client) CreateNote(ctx context.Context, accessToken string, payload CreateNoteRequest) (*CreateNoteResponse, error) {
+	req, err := c.newRequest(ctx, "POST", "/api/collections/"+payload.CollectionID+"/notes", payload)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		apiErr, err := decodeAPIError(res.Body)
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("api error: %s", apiErr.Code)
+	}
+
+	var resp CreateNoteResponse
+	dec := json.NewDecoder(res.Body)
+	if err := dec.Decode(&resp); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &resp, nil
 }

@@ -24,12 +24,19 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/k-kanke/code-stash-cli/internal/state"
 )
 
-var cfgFile string
+var (
+	cfgFile     string
+	appState    *state.State
+	projectRoot string
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -49,8 +56,7 @@ to quickly create a Cobra application.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
@@ -63,6 +69,8 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.code-stash-cli.yaml)")
+	rootCmd.PersistentFlags().String("root", ".", "project root for codestash state")
+	_ = viper.BindPFlag("project_root", rootCmd.PersistentFlags().Lookup("root"))
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -91,4 +99,37 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+
+	rootFlag := viper.GetString("project_root")
+	if rootFlag == "" {
+		rootFlag = "."
+	}
+	var err error
+	projectRoot, err = filepath.Abs(rootFlag)
+	cobra.CheckErr(err)
+
+	appState, err = state.Load(projectRoot)
+	cobra.CheckErr(err)
+}
+
+func requireState() *state.State {
+	if appState == nil {
+		cobra.CheckErr(fmt.Errorf("state not initialized"))
+	}
+	return appState
+}
+
+func statePath() string {
+	return projectRoot
+}
+
+func relativeToRoot(absPath string) string {
+	if absPath == "" {
+		return ""
+	}
+	rel, err := filepath.Rel(projectRoot, absPath)
+	if err != nil {
+		return absPath
+	}
+	return filepath.ToSlash(rel)
 }
