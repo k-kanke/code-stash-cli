@@ -49,6 +49,16 @@ type CreateNoteResponse struct {
 	NoteID string `json:"id"`
 }
 
+type NoteSummary struct {
+	ID        string    `json:"id"`
+	Title     string    `json:"title"`
+	Language  string    `json:"language"`
+	Tags      []string  `json:"tags"`
+	Snippet   string    `json:"snippet"`
+	FolderID  *string   `json:"folder_id"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type Client struct {
 	baseURL      *url.URL
 	clientID     string
@@ -150,19 +160,25 @@ func (c *Client) post(ctx context.Context, target string, payload any, out any) 
 }
 
 func (c *Client) newRequest(ctx context.Context, method, endpoint string, payload any) (*http.Request, error) {
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("encode payload: %w", err)
+	var bodyReader io.Reader
+	if payload != nil {
+		body, err := json.Marshal(payload)
+		if err != nil {
+			return nil, fmt.Errorf("encode payload: %w", err)
+		}
+		bodyReader = bytes.NewReader(body)
 	}
 
 	u := *c.baseURL
 	u.Path = joinPath(c.baseURL.Path, endpoint)
 
-	req, err := http.NewRequestWithContext(ctx, method, u.String(), bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, method, u.String(), bodyReader)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	return req, nil
 }
 
@@ -218,4 +234,35 @@ func (c *Client) CreateNote(ctx context.Context, accessToken string, payload Cre
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return &resp, nil
+}
+
+func (c *Client) ListNotes(ctx context.Context, accessToken, collectionID string) ([]NoteSummary, error) {
+	req, err := c.newRequest(ctx, "GET", "/api/collections/"+collectionID+"/notes", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		apiErr, err := decodeAPIError(res.Body)
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("api error: %s", apiErr.Code)
+	}
+
+	var notes []NoteSummary
+	if err := json.NewDecoder(res.Body).Decode(&notes); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return notes, nil
 }
