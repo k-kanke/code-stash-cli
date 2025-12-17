@@ -91,6 +91,10 @@ var notesCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		if resp == nil || resp.NoteID == "" {
+			cmd.Println("Note created, but the server did not return an ID. Skipping local mapping.")
+			return nil
+		}
 
 		st.SetFileMapping(ctx.Name, relativeToRoot(absFile), resp.NoteID)
 		if err := st.Save(); err != nil {

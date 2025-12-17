@@ -8,4 +8,4 @@ codestash-cli
 *.log
 /.code-stash-cli.yaml
 .DS_Store
-.codestash/
+*.codestash
