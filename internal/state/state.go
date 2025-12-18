@@ -13,6 +13,13 @@ type FileMapping struct {
 	NoteID string `json:"note_id"`
 }
 
+type Scope string
+
+const (
+	ScopeFolder Scope = "folder"
+	ScopeNote   Scope = "note"
+)
+
 type Context struct {
 	Name       string `json:"name"`
 	Collection string `json:"collection"`
@@ -20,10 +27,13 @@ type Context struct {
 }
 
 type State struct {
-	Contexts       map[string]Context                `json:"contexts"`
-	CurrentContext string                            `json:"current_context"`
-	Files          map[string]map[string]FileMapping `json:"files"`
-	path           string
+	Contexts         map[string]Context                `json:"contexts"`
+	CurrentContext   string                            `json:"current_context"`
+	CurrentScope     Scope                             `json:"current_scope,omitempty"`
+	CurrentNoteID    string                            `json:"current_note,omitempty"`
+	CurrentNoteTitle string                            `json:"current_note_title,omitempty"`
+	Files            map[string]map[string]FileMapping `json:"files"`
+	path             string
 }
 
 func Load(root string) (*State, error) {
@@ -32,9 +42,10 @@ func Load(root string) (*State, error) {
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return &State{
-				Contexts: make(map[string]Context),
-				Files:    make(map[string]map[string]FileMapping),
-				path:     path,
+				Contexts:     make(map[string]Context),
+				Files:        make(map[string]map[string]FileMapping),
+				CurrentScope: ScopeFolder,
+				path:         path,
 			}, nil
 		}
 		return nil, fmt.Errorf("read state: %w", err)
@@ -49,6 +60,13 @@ func Load(root string) (*State, error) {
 	}
 	if st.Files == nil {
 		st.Files = make(map[string]map[string]FileMapping)
+	}
+	if st.CurrentScope == "" {
+		st.CurrentScope = ScopeFolder
+	}
+	if st.CurrentScope != ScopeNote {
+		st.CurrentNoteID = ""
+		st.CurrentNoteTitle = ""
 	}
 	st.path = path
 	return &st, nil
@@ -85,6 +103,9 @@ func (s *State) SetContext(name, collectionID, folderID string) {
 	if s.CurrentContext == "" {
 		s.CurrentContext = name
 	}
+	if s.CurrentScope == "" {
+		s.CurrentScope = ScopeFolder
+	}
 }
 
 func (s *State) SwitchContext(name string) error {
@@ -92,6 +113,7 @@ func (s *State) SwitchContext(name string) error {
 		return fmt.Errorf("context %q not found", name)
 	}
 	s.CurrentContext = name
+	s.EnterFolderScope()
 	return nil
 }
 
@@ -125,4 +147,38 @@ func (s *State) GetFileMapping(ctxName, relativePath string) (FileMapping, bool)
 	rel := strings.ReplaceAll(relativePath, "\\", "/")
 	m, ok := files[rel]
 	return m, ok
+}
+
+func (s *State) EnterFolderScope() {
+	s.CurrentScope = ScopeFolder
+	s.CurrentNoteID = ""
+	s.CurrentNoteTitle = ""
+}
+
+func (s *State) EnterNoteScope(noteID, title string) error {
+	noteID = strings.TrimSpace(noteID)
+	if noteID == "" {
+		return errors.New("note id is required")
+	}
+	s.CurrentScope = ScopeNote
+	s.CurrentNoteID = noteID
+	s.CurrentNoteTitle = strings.TrimSpace(title)
+	return nil
+}
+
+func (s *State) Scope() Scope {
+	if s.CurrentScope == "" {
+		return ScopeFolder
+	}
+	return s.CurrentScope
+}
+
+func (s *State) CurrentNote() (string, string, error) {
+	if s.Scope() != ScopeNote {
+		return "", "", errors.New("not in note scope")
+	}
+	if strings.TrimSpace(s.CurrentNoteID) == "" {
+		return "", "", errors.New("no active note selected")
+	}
+	return s.CurrentNoteID, s.CurrentNoteTitle, nil
 }

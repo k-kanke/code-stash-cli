@@ -276,7 +276,7 @@ func (c *Client) ListNotes(ctx context.Context, accessToken, collectionID string
 }
 
 func (c *Client) UpdateNote(ctx context.Context, accessToken, noteID string, payload UpdateNoteRequest) error {
-	req, err := c.newRequest(ctx, "PATCH", "/api/notes/"+noteID, payload)
+	req, err := c.newRequest(ctx, "PATCH", "/api/note/"+noteID, payload)
 	if err != nil {
 		return err
 	}

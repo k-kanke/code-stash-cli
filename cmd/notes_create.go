@@ -26,6 +26,9 @@ var notesCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new note in the current context",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := requireFolderScope(); err != nil {
+			return err
+		}
 		if strings.TrimSpace(noteCreateFile) == "" {
 			return errors.New("--file is required")
 		}

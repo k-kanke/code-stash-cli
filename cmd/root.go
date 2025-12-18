@@ -133,3 +133,19 @@ func relativeToRoot(absPath string) string {
 	}
 	return filepath.ToSlash(rel)
 }
+
+func requireFolderScope() error {
+	st := requireState()
+	if st.Scope() != state.ScopeFolder {
+		return fmt.Errorf("this command is only available in folder scope; run `codestash note exit` to leave the current note")
+	}
+	return nil
+}
+
+func requireNoteScope() error {
+	st := requireState()
+	if st.Scope() != state.ScopeNote {
+		return fmt.Errorf("this command is only available in note scope; run `codestash note switch <id>` first")
+	}
+	return nil
+}

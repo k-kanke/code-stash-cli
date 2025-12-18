@@ -43,6 +43,9 @@ var contextSwitchCmd = &cobra.Command{
 	Short: "Switch active context",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := requireFolderScope(); err != nil {
+			return err
+		}
 		st := requireState()
 		name := args[0]
 		if err := st.SwitchContext(name); err != nil {

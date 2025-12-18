@@ -26,12 +26,15 @@ var notesUpdateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update an existing note based on a local file",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := requireNoteScope(); err != nil {
+			return err
+		}
 		if strings.TrimSpace(noteUpdateFile) == "" {
 			return errors.New("--file is required")
 		}
 
 		st := requireState()
-		ctx, err := st.Current()
+		noteID, noteTitle, err := st.CurrentNote()
 		if err != nil {
 			return err
 		}
@@ -39,11 +42,6 @@ var notesUpdateCmd = &cobra.Command{
 		absFile, err := filepath.Abs(noteUpdateFile)
 		if err != nil {
 			return err
-		}
-		rel := relativeToRoot(absFile)
-		mapping, ok := st.GetFileMapping(ctx.Name, rel)
-		if !ok || mapping.NoteID == "" {
-			return fmt.Errorf("no note mapping found for %s; create first or specify note id manually", rel)
 		}
 
 		fileContent, err := os.ReadFile(absFile)
@@ -111,11 +109,15 @@ var notesUpdateCmd = &cobra.Command{
 			req.Note = noteContent
 		}
 
-		if err := client.UpdateNote(cmd.Context(), token.AccessToken, mapping.NoteID, req); err != nil {
+		if err := client.UpdateNote(cmd.Context(), token.AccessToken, noteID, req); err != nil {
 			return err
 		}
 
-		cmd.Printf("Updated note %s (%s)\n", mapping.NoteID, rel)
+		target := noteID
+		if noteTitle != "" {
+			target = fmt.Sprintf("%s (%s)", noteTitle, noteID)
+		}
+		cmd.Printf("Updated note %s\n", target)
 		return nil
 	},
 }
